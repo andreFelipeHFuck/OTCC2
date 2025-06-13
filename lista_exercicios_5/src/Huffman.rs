@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
     #[derive(Debug, Clone)]
-    enum Huffman {
+    pub enum Huffman {
         Leaf {c: char, freq: u32},
         Node {freq: u32, left: Box<Huffman>, right: Box<Huffman>}
     }
@@ -17,7 +17,8 @@ use std::collections::HashMap;
         pub fn new_leaf(c: char, freq: u32) -> Self {
             Huffman::Leaf{c, freq}
         }
-    
+
+        
         pub fn new_node(node_a: Huffman, node_b: Huffman) -> Self {
             let freq_a: u32 = match node_a {
                 Self::Leaf { c: _, freq } => freq,
@@ -28,7 +29,7 @@ use std::collections::HashMap;
                 Self::Leaf { c: _, freq } => freq,
                 Self::Node { freq, left: _, right: _ } => freq
             };
-
+            
             Huffman::Node { 
                 freq: freq_a + freq_b, 
                 left: Box::new(node_a), 
@@ -36,12 +37,19 @@ use std::collections::HashMap;
             }
         }
 
+        pub fn get_freq(&mut self) -> u32{
+            match self {
+                Self::Leaf { c: _, freq } => *freq,
+                Self::Node { freq, left: _, right: _ } => *freq
+            }
+        }
+        
         pub fn traverse(&mut self, code: String, i: usize) -> Option<char>{
             match self {
-                Huffman::Leaf { c, freq } => {
+                Huffman::Leaf { c, freq: _ } => {
                    return Some(*c);
                 },
-                Huffman::Node { freq, left, right } => {
+                Huffman::Node { freq: _, left, right } => {
                     if code.char_indices().nth(i) == Some((i, '0')){
 
                         return left.traverse(code, i + 1);
@@ -59,7 +67,7 @@ use std::collections::HashMap;
 
         fn pre_order(&mut self, code: &mut String, map: &mut HashMap<char, String>) {
             match self {
-                Huffman::Leaf { c, freq } => {
+                Huffman::Leaf { c, freq: _ } => {
                   map.insert(*c, code.clone());
                 },
 
@@ -87,8 +95,6 @@ use std::collections::HashMap;
 
     #[cfg(test)]
     mod tests {
-        use std::clone;
-
         use super::*;
     
         #[test]
@@ -248,5 +254,12 @@ use std::collections::HashMap;
             assert_eq!(map.get(&'b').unwrap(), "01");
             assert_eq!(map.get(&'c').unwrap(), "10");
             assert_eq!(map.get(&'d').unwrap(), "11");
+        }
+
+        #[test]
+        pub fn get_freq_test(){
+            let mut node: Huffman = Huffman::new_leaf('a', 1);
+
+            assert_eq!(node.get_freq(), 1)
         }
     }
