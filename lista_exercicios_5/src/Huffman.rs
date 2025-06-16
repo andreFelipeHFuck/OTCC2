@@ -44,10 +44,10 @@ use std::collections::HashMap;
             }
         }
         
-        pub fn traverse(&mut self, code: String, i: usize) -> Option<char>{
+        pub fn traverse(&mut self, code: &mut String, i: usize) -> Option<(char, usize)>{
             match self {
                 Huffman::Leaf { c, freq: _ } => {
-                   return Some(*c);
+                   return Some((*c, i));
                 },
                 Huffman::Node { freq: _, left, right } => {
                     if code.char_indices().nth(i) == Some((i, '0')){
@@ -60,7 +60,6 @@ use std::collections::HashMap;
                     } else {
                         None
                     }
-
                 }
             }
         }
@@ -89,6 +88,19 @@ use std::collections::HashMap;
             let mut code: String = String::from("");
 
             self.pre_order(&mut code, map);
+        }
+
+        pub fn compression_string(&mut self, code: String, map: &mut HashMap<char, String>) -> Option<String> {
+
+            if code.is_empty() {return None;}
+
+            let mut res: String = String::new();
+
+            for c in code.chars(){  
+                res += map.get(&c).unwrap();
+            }
+
+            return Some(res);
         }
     }
 
@@ -192,17 +204,15 @@ use std::collections::HashMap;
 
                 },
                 _ => panic!("O Nó tem que ser um node")
-            }
-          
-                
+            }      
         }
 
         #[test]
         pub fn traverse_test(){
-            let code_00: String = String::from("00");
-            let code_01: String = String::from("01");
-            let code_10: String = String::from("10");
-            let code_11: String = String::from("11");
+            let mut code_00: String = String::from("00");
+            let mut code_01: String = String::from("01");
+            let mut code_10: String = String::from("10");
+            let mut code_11: String = String::from("11");
 
 
             let leaf_a: Huffman = Huffman::new_leaf('a', 1);
@@ -218,19 +228,19 @@ use std::collections::HashMap;
 
             println!("Code_00: {} = a", code_00);
 
-            assert_eq!(node_g.traverse(code_00, 0), Some('a'));
+            assert_eq!(node_g.traverse(&mut code_00, 0), Some(('a', 2)));
 
             println!("Code_00: {} = b", code_01);
 
-            assert_eq!(node_g.traverse(code_01, 0), Some('b'));
+            assert_eq!(node_g.traverse(&mut code_01, 0), Some(('b', 2)));
 
             println!("Code_10: {} = c", code_10);
 
-            assert_eq!(node_g.traverse(code_10, 0), Some('c'));
+            assert_eq!(node_g.traverse(&mut code_10, 0), Some(('c', 2)));
 
             println!("Code_11: {} = d", code_11);
 
-            assert_eq!(node_g.traverse(code_11, 0), Some('d'));
+            assert_eq!(node_g.traverse(&mut code_11, 0), Some(('d', 2)));
 
         }
         
@@ -261,5 +271,27 @@ use std::collections::HashMap;
             let mut node: Huffman = Huffman::new_leaf('a', 1);
 
             assert_eq!(node.get_freq(), 1)
+        }
+
+        #[test]
+        pub fn compression_string_test(){
+            let mut map: HashMap<char, String> = HashMap::new();
+
+            let leaf_a: Huffman = Huffman::new_leaf('a', 1);
+            let leaf_b: Huffman = Huffman::new_leaf('b', 2);
+            let leaf_c: Huffman = Huffman::new_leaf('c', 3);
+            let leaf_d: Huffman = Huffman::new_leaf('d', 4);
+
+            let node_e: Huffman = Huffman::new_node(leaf_a, leaf_b);
+            let node_f: Huffman = Huffman::new_node(leaf_c, leaf_d);
+
+            let mut node_g: Huffman = Huffman::new_node(node_e, node_f);
+
+            node_g.pre_order_code(&mut map);
+
+            let res: String = node_g.compression_string("abc".to_string(), &mut map).unwrap();
+
+            assert_eq!(res, "000110"); 
+
         }
     }

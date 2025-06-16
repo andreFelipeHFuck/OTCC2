@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::Huffman::{Huffman};
 
 #[derive(Debug, Clone)]
-struct VectorNode {
+pub struct VectorNode {
     vec: Vec<Huffman>,
     min_index: Option<usize>
 }
@@ -11,6 +11,14 @@ struct VectorNode {
 impl VectorNode {
     pub fn new() -> Self {
         VectorNode{ vec: Vec::new(), min_index: None }
+    }
+
+    pub fn build_vector(&mut self, map: &mut HashMap<char, u32>) {
+
+      for (c, f) in map {
+        let node: Huffman = Huffman::new_leaf(*c, *f);
+        self.push(node);
+      }
     }
 
     pub fn push(&mut self, mut node: Huffman) {
@@ -69,9 +77,6 @@ impl VectorNode {
       }
 
       if self.vec.len() == 1 {
-        // let mut map: HashMap<char, String> = HashMap::new();
-
-        // node.pre_order_code(&mut map);
 
         return self.min().unwrap();
 
@@ -86,6 +91,23 @@ impl VectorNode {
         node.pre_order_code(&mut map);
 
         return map;
+    }
+
+    pub fn traverse_code(node: &mut Huffman, code: &mut String) -> String{
+
+      if code.is_empty() {return  String::new();}
+
+      let mut res: String = String::new();
+
+      let mut c: char;
+      let mut i: usize = 0;
+
+      while i < code.len() {
+         (c, i) = node.traverse(code, i).unwrap();
+         res.push(c);
+      }
+
+      return res;
     }
 
 }
@@ -105,13 +127,22 @@ use super::*;
   }
 
   #[test]
+  fn build_vector_test(){
+
+  }
+
+  #[test]
   fn push_vector_node_test(){
+     let mut map: HashMap<char, u32> = HashMap::new();
+
      let mut vector_node: VectorNode = VectorNode::new();
 
-     vector_node.push(Huffman::new_leaf('a', 1));
-     vector_node.push(Huffman::new_leaf('b', 2));
-     vector_node.push(Huffman::new_leaf('c', 3));
-     vector_node.push(Huffman::new_leaf('d', 4));
+     map.insert('a', 1);
+     map.insert('b', 1);
+     map.insert('c', 1);
+     map.insert('d', 1);
+
+     vector_node.build_vector(&mut map);
 
      assert_eq!(vector_node.vec.len(), 4);
   }
@@ -186,6 +217,43 @@ use super::*;
       assert_eq!(map.get(&'c').unwrap(), "10");
       assert_eq!(map.get(&'a').unwrap(), "110");
       assert_eq!(map.get(&'b').unwrap(), "111");
+  }
+
+  #[test]
+  fn build_traverse_code_test(){
+    let mut vector_node: VectorNode = VectorNode::new();
+
+    vector_node.push(Huffman::new_leaf('a', 1));
+    vector_node.push(Huffman::new_leaf('b', 2));
+    vector_node.push(Huffman::new_leaf('c', 3));
+    vector_node.push(Huffman::new_leaf('d', 4));
+
+    let mut node: Huffman = vector_node.build_tree();
+
+    let unpacked: String = VectorNode::traverse_code(&mut node, &mut "".to_string());
+
+    assert_eq!(String::new(), unpacked);
+
+    let unpacked: String = VectorNode::traverse_code(&mut node, &mut "0".to_string());
+
+    assert_eq!("d".to_string(), unpacked);
+
+    let unpacked: String = VectorNode::traverse_code(&mut node, &mut "10".to_string());
+
+    assert_eq!("c".to_string(), unpacked);
+
+    let unpacked: String = VectorNode::traverse_code(&mut node, &mut "110".to_string());
+
+    assert_eq!("a".to_string(), unpacked);
+
+    let unpacked: String = VectorNode::traverse_code(&mut node, &mut "111".to_string());
+
+    assert_eq!("b".to_string(), unpacked);
+
+    println!("");
+    let unpacked: String = VectorNode::traverse_code(&mut node, &mut "1101111111010100000".to_string());
+
+    assert_eq!("abbcccdddd".to_string(), unpacked);
 
   }
 
