@@ -110,14 +110,8 @@ fn divide_string(s: &String, size: usize) -> Vec<String> {
     return v;
 }
 
-fn write(arq: String, n: u32, map_freq: &HashMap<char, u32>, vec_bytes: Vec<String>) -> io::Result<()> {
-
-    println!();
-    println!("LEM MAP: {}", map_freq.len());
-    println!("N: {}", n);
-    println!();
-
-    let mut fs = File::create_new(arq)?;
+fn write(file: String, n: u32, map_freq: &HashMap<char, u32>, vec_bytes: Vec<String>) -> io::Result<()> {
+    let mut fs = File::create_new(file)?;
     let mut buffer = Cursor::new(Vec::new());
 
     buffer.write_u16::<BigEndian>(map_freq.len() as u16)?;
@@ -144,7 +138,62 @@ fn write(arq: String, n: u32, map_freq: &HashMap<char, u32>, vec_bytes: Vec<Stri
     Ok(())
 }
 
+fn read(file: String) -> io::Result<(u32, Huffman::Huffman, Vec<u8>)> {
+    let mut map_freq: HashMap<char, u32> = HashMap::new();
+    let mut v_u8: Vec<u8> = Vec::new();
 
+    let mut fs = File::open(file)?;
+    let mut v: Vec<u8> = Vec::new();
+    fs.read_to_end(&mut v)?;
+    let mut buffer = Cursor::new(v);
+
+    let num_char_dist: u16 = buffer.read_u16::<BigEndian>().unwrap();
+    let mum_char: u32 = buffer.read_u32::<BigEndian>().unwrap();
+
+    let mut c:char;
+    let mut f:u32;
+
+    for _ in 0..num_char_dist{
+        c = char::from_u32(buffer.read_u32::<BigEndian>().unwrap()).unwrap();
+        f = buffer.read_u32::<BigEndian>().unwrap();
+
+        map_freq.insert(c, f);
+    }
+
+    let mut vector_node = VectorNode::VectorNode::new();
+    vector_node.build_vector(&mut map_freq);
+    let node: Huffman::Huffman =  vector_node.build_tree();
+
+    while let Ok(b) = buffer.read_u8() {
+        v_u8.push(b);
+    }
+
+    Ok((mum_char, node, v_u8 ))
+}
+
+fn bit_mask(b: u8, i: usize) -> char{
+    if i <= 7 {
+        let m: u8 = 0 | (1 << i);
+
+        if b & m == 0 {
+            return '0';
+        }else {
+            return '1';
+        }
+    }else{
+        panic!("O Indice i de ser de 0 até 7");
+    }
+}
+
+fn convert_u8_to_string(b: u8) -> String{
+    let mut s: String = String::new();
+
+    for i in (0..8).rev(){
+        s.push(bit_mask(b, i));
+    }
+
+    return s;
+}
 
 #[cfg(test)]
 mod test {
@@ -190,7 +239,6 @@ mod test {
 
         compression(file.to_string(), file_bin.to_string())?;
 
-     
         let num_char_test: u32 = 23;
 
         // Le arquivo binário 
@@ -247,5 +295,39 @@ mod test {
         assert_eq!("00000000".to_string(), v_s[3]);
     }
 
+    #[test]
+    fn read_test() -> io::Result <()>{
+        let file_bin = "test_bin.bin";
+
+        let num_char_test: u32 = 23;
+        let (mum_char, _, _) = read(file_bin.to_string())?;
+
+
+        assert_eq!(num_char_test, mum_char);
+
+        Ok(())
+    }
+
+    #[test]
+    fn bit_mask_test() {
+        let b: u8 = 0b0101_0101;
+
+        assert_eq!(bit_mask(b, 0), '1');
+        assert_eq!(bit_mask(b, 1), '0');
+        assert_eq!(bit_mask(b, 2), '1');
+        assert_eq!(bit_mask(b, 3), '0');
+
+        assert_eq!(bit_mask(b, 4), '1');
+        assert_eq!(bit_mask(b, 5), '0');
+        assert_eq!(bit_mask(b, 6), '1');
+        assert_eq!(bit_mask(b, 7), '0');
+    }
+
+    #[test]
+    fn convert_u8_to_string_test() {
+        let b: u8 = 0b0101_0101;
+
+        assert_eq!(convert_u8_to_string(b), "01010101".to_string());
+    }
 }
 
