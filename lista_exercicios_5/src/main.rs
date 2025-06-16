@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 use std::io;
-use utf8_read::Reader;
+use utf8_read::{Reader, StreamPosition};
 
 fn main() {
     println!("Hello, world!");
@@ -47,6 +47,8 @@ fn compression_map(file: &String) -> Result<(u32, HashMap<char, u32>, HashMap<ch
     let mut vector_node = VectorNode::VectorNode::new();
     vector_node.build_vector(&mut map);
     let node: Huffman::Huffman =  vector_node.build_tree();
+
+    // println!("NODE TEST: {:?}", node);
 
     Ok((n, map, VectorNode::VectorNode::build_code(node)))
 }
@@ -122,15 +124,9 @@ fn write(file: String, n: u32, map_freq: &HashMap<char, u32>, vec_bytes: Vec<Str
         buffer.write_u32::<BigEndian>(*i.1)?;
     }
 
-    fs.write_all(buffer.get_mut())?;
-
+    println!("LEN: {}", vec_bytes.len());
     for b in vec_bytes{
-        match u8::from_str_radix(&b, 2) {
-            Ok(num) => {
-                buffer.write_u8(num)?;
-            },
-            Err(e) => {panic!("Não foi possível escrever o byte no arquivo, Error: {}", e)}
-        }
+        buffer.write_u8(convert_string_to_u8(b))?;
     }
 
     fs.write_all(buffer.get_mut())?;
@@ -164,11 +160,25 @@ fn read(file: String) -> io::Result<(u32, Huffman::Huffman, Vec<u8>)> {
     vector_node.build_vector(&mut map_freq);
     let node: Huffman::Huffman =  vector_node.build_tree();
 
-    while let Ok(b) = buffer.read_u8() {
-        v_u8.push(b);
+    loop{
+        if let Ok(b) =  buffer.read_u8(){
+            v_u8.push(b);  
+        }else{
+            break;
+        }
     }
 
+    println!("LEN: {}", v_u8.len());
+
     Ok((mum_char, node, v_u8 ))
+}
+
+fn add_bit(b: u8, c: char, i: usize) -> u8{
+    if c == '1'{
+        return b | (1 << i);
+    }
+
+    return b;
 }
 
 fn bit_mask(b: u8, i: usize) -> char{
@@ -185,6 +195,16 @@ fn bit_mask(b: u8, i: usize) -> char{
     }
 }
 
+fn convert_string_to_u8(s: String) -> u8{
+    let mut b: u8 = 0b0000_0000;
+
+    for (i, c) in s.chars().rev().enumerate(){
+        b = add_bit(b, c, i);
+    }
+
+    return b;
+}
+
 fn convert_u8_to_string(b: u8) -> String{
     let mut s: String = String::new();
 
@@ -193,6 +213,39 @@ fn convert_u8_to_string(b: u8) -> String{
     }
 
     return s;
+}
+
+
+fn build_str_code(v_u8: &Vec<u8>) -> String{
+    let mut str_code: String = String::new();
+
+    println!("VEC U8: {:?}", v_u8);
+    for b in v_u8{
+        str_code += &convert_u8_to_string(*b);
+        println!("STR CODE: {}", &convert_u8_to_string(*b));
+    }
+
+
+    return str_code;
+}
+
+fn write_txt(file_txt: String, text: String) -> io::Result<()>{
+    let mut file = File::create(file_txt)?;
+    file.write_all(text.as_bytes())?;
+    Ok(())
+}
+
+fn decompressor(file: String, file_txt: String) -> io::Result<()>{
+    let (mum_char, mut node, v_u8) = read(file)?;
+    let mut str_code: String = build_str_code(&v_u8);
+
+    let text: String = VectorNode::VectorNode::traverse_code_num_char(&mut node, &mut str_code, mum_char);
+    println!("STR CODE: {}", str_code);
+    println!("TEXT: {}", text);
+
+    write_txt(file_txt, text)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -239,8 +292,6 @@ mod test {
 
         compression(file.to_string(), file_bin.to_string())?;
 
-        let num_char_test: u32 = 23;
-
         // Le arquivo binário 
         let mut fs = File::open(file_bin.to_string())?;
         let mut v: Vec<u8> = Vec::new();
@@ -259,7 +310,7 @@ mod test {
         /*
             Verifica se foi possui o mesmo número de caracteres
         */
-        let num_char_test: u32 = 23;
+        let num_char_test: u32 = 21;
         let mum_char: u32 = buffer.read_u32::<BigEndian>().unwrap();
 
         println!("NUM CHAR TEST: {}, NUM CHAR: {}", num_char_test, mum_char);
@@ -269,6 +320,7 @@ mod test {
             Verifica se o mapa de frequência lido no arquivo binário é igual ao 
             mapa de frequência criado pelo mapa criado para o arquivo text
         */
+        let mut map_test: HashMap<char, u32> = HashMap::new();
         let mut c:char;
         let mut f:u32;
 
@@ -277,8 +329,32 @@ mod test {
             f = buffer.read_u32::<BigEndian>().unwrap();
             println!("{c} - {f}");
 
-            assert_eq!(map.get(&c), Some(&f))
+            map_test.insert(c, f);
         }
+
+        println!("MAP: {:?}", map);
+        println!("MAP TEST: {:?}", map_test);
+        assert_eq!(map, map_test);
+
+
+        /*
+            Verifica quantos u8 foram escritas no arquivo binário
+         */
+        let mut v_u8: Vec<u8> = Vec::new();
+        let qtd_u8_test: u32 = 7;
+        let mut cont_qtd_u8: u32 = 0;
+
+        loop{
+            if let Ok(b) =  buffer.read_u8(){
+                v_u8.push(b);  
+                cont_qtd_u8 += 1;
+            }else{
+                break;
+            }
+        }
+
+        println!("QTD U8 TEST: {},  CONT QTD U8: {}", qtd_u8_test, cont_qtd_u8);
+        assert_eq!(qtd_u8_test, cont_qtd_u8);
 
         Ok(())
     }
@@ -302,12 +378,26 @@ mod test {
         let num_char_test: u32 = 23;
         let (mum_char, _, _) = read(file_bin.to_string())?;
 
-
         assert_eq!(num_char_test, mum_char);
 
         Ok(())
     }
 
+    #[test]
+    fn add_bit_test(){
+        assert_eq!(0b0000_0001 as u8, add_bit(0b0000_0000, '1', 0));
+        assert_eq!(0b0000_0010 as u8, add_bit(0b0000_0000, '1', 1));
+        assert_eq!(0b0000_0000 as u8, add_bit(0b0000_0000, '0', 1));
+        assert_eq!(0b1000_0000 as u8, add_bit(0b0000_0000, '1', 7));
+    }
+
+    #[test]
+    fn convert_string_to_u8_test(){
+        let s = "00001111".to_string();
+
+        assert_eq!(0b0000_1111, convert_string_to_u8(s));
+    }
+    
     #[test]
     fn bit_mask_test() {
         let b: u8 = 0b0101_0101;
@@ -328,6 +418,14 @@ mod test {
         let b: u8 = 0b0101_0101;
 
         assert_eq!(convert_u8_to_string(b), "01010101".to_string());
+    }
+
+    #[test]
+    fn decompressor_test(){
+        let file_bin = "test_bin.bin";
+        let file_txt = "text_txt_test.txt";
+
+        decompressor(file_bin.to_string(), file_txt.to_string()).unwrap();
     }
 }
 

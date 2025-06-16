@@ -110,6 +110,25 @@ impl VectorNode {
       return res;
     }
 
+    pub fn traverse_code_num_char(node: &mut Huffman, code: &mut String, num_char: u32) -> String{
+
+      if code.is_empty() {return  String::new();}
+
+      let mut res: String = String::new();
+      let mut cont: u32 = 0;
+
+      let mut c: char;
+      let mut i: usize = 0;
+
+      while cont < num_char {
+         (c, i) = node.traverse(code, i).unwrap();
+         res.push(c);
+         cont += 1;
+      }
+
+      return res;
+    }
+
 }
 
 #[cfg(test)]
@@ -255,6 +274,21 @@ use super::*;
 
     assert_eq!("abbcccdddd".to_string(), unpacked);
 
+  }
+
+  #[test]
+  fn traverse_code_num_char_test(){
+    let mut vector_node: VectorNode = VectorNode::new();
+
+    vector_node.push(Huffman::new_leaf('a', 1));
+    vector_node.push(Huffman::new_leaf('b', 2));
+    vector_node.push(Huffman::new_leaf('c', 3));
+    vector_node.push(Huffman::new_leaf('d', 4));
+
+    let mut node: Huffman = vector_node.build_tree();
+
+    let unpacked: String = VectorNode::traverse_code_num_char(&mut node, &mut "110111111101010000001111111111111111111111111".to_string(), 10);
+    assert_eq!("abbcccdddd".to_string(), unpacked);
   }
 
 }
