@@ -14,14 +14,22 @@ impl VectorNode {
     }
 
     pub fn build_vector(&mut self, map: &mut HashMap<char, u32>) {
+      // Sort 
+      let mut sort_nodes: Vec<(char, u32)> = Vec::new();
 
       for (c, f) in map {
-        let node: Huffman = Huffman::new_leaf(*c, *f);
+        sort_nodes.push((*c, *f));
+      }
+
+      sort_nodes.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+
+      for (c, f) in sort_nodes {
+        let node: Huffman = Huffman::new_leaf(c, f);
         self.push(node);
       }
     }
 
-    pub fn push(&mut self, mut node: Huffman) {
+    pub fn push(&mut self, node: Huffman) {
         self.vec.push(node);
         self.select_min();
 
@@ -67,15 +75,15 @@ impl VectorNode {
 
     pub fn build_tree(&mut self) -> Huffman {
       while self.vec.len() > 1 {
-          let mut node_a: Huffman = self.min().unwrap();
+          let node_a: Huffman = self.min().unwrap();
 
           self.select_min();
 
-          let mut node_b: Huffman = self.min().unwrap();
+          let node_b: Huffman = self.min().unwrap();
 
           self.select_min();
 
-          let mut node: Huffman = Huffman::new_node(node_a, node_b);
+          let node: Huffman = Huffman::new_node(node_a, node_b);
 
           self.push(node);
       }
@@ -97,6 +105,7 @@ impl VectorNode {
         return map;
     }
 
+    #[warn(dead_code)]
     pub fn traverse_code(node: &mut Huffman, code: &mut String) -> String{
 
       if code.is_empty() {return  String::new();}

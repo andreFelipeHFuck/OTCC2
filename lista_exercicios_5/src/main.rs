@@ -12,7 +12,8 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 struct Args {
     operation: String,
-    file: String
+    file: String,
+    file_dest: String
 }
 
 fn main() {
@@ -21,22 +22,15 @@ fn main() {
     let compr: String = String::from("compr");
     let decom: String = String::from("decom");
 
-    println!("OP: {}", args.operation);
-
     if args.operation == compr {
-        let file_bin: Vec<&str> = args.file.split('.').collect();
-        compression(file_bin[0].to_string() + "." + file_bin[1], file_bin[0].to_string() + ".bin").unwrap();
+        compression(args.file, args.file_dest).unwrap();
         println!("File compression successful!");
     }else if args.operation == decom {
-        let file_txt: Vec<&str> = args.file.split('.').collect();
-        decompressor(file_txt[0].to_string() + "." + file_txt[1], file_txt[0].to_string() + "1.txt").unwrap();
+        decompressor(args.file, args.file_dest).unwrap();
         println!("File decompressor successful!");
     }else{
         panic!("Operation not found");
     }
-
-   
-
 }
 
 fn frequency(file: String, map_freq: &mut HashMap<char, u32>) -> io::Result<usize> {
@@ -66,7 +60,7 @@ fn compression_map(file: &String) -> Result<(u32, HashMap<char, u32>, HashMap<ch
     match frequency(file.to_string(), &mut map) {
             Ok(t) => {
                 n = t as u32;
-                println!("O arquivo possui {t} caracteres.");
+                // println!("O arquivo possui {t} caracteres.");
             },
             Err(_) => {panic!("Arquivo {file} não existe.");}
     }
@@ -140,7 +134,7 @@ fn divide_string(s: &String, size: usize) -> Vec<String> {
 }
 
 fn write(file: String, n: u32, map_freq: &HashMap<char, u32>, vec_bytes: Vec<String>) -> io::Result<()> {
-    let mut fs = File::create_new(file)?;
+    let mut fs = File::create(file)?;
     let mut buffer = Cursor::new(Vec::new());
 
     buffer.write_u16::<BigEndian>(map_freq.len() as u16)?;
@@ -181,6 +175,8 @@ fn read(file: String) -> io::Result<(u32, Huffman::Huffman, Vec<u8>)> {
 
         map_freq.insert(c, f);
     }
+
+    println!("MAP: {:?}", map_freq);
 
     let mut vector_node = VectorNode::VectorNode::new();
     vector_node.build_vector(&mut map_freq);

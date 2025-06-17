@@ -90,6 +90,7 @@ use std::collections::HashMap;
             self.pre_order(&mut code, map);
         }
 
+        #[warn(dead_code)]
         pub fn compression_string(&mut self, code: String, map: &mut HashMap<char, String>) -> Option<String> {
 
             if code.is_empty() {return None;}
