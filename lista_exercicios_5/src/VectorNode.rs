@@ -22,17 +22,21 @@ impl VectorNode {
     }
 
     pub fn push(&mut self, mut node: Huffman) {
-      if self.min_index.is_none(){
-        self.min_index = Some(0);
         self.vec.push(node);
-      }else{
-        if node.get_freq() < self.vec[self.min_index.unwrap()].get_freq(){
-          self.min_index = Some(self.min_index.unwrap() + 1);
-          self.vec.push(node);
-        }else{
-          self.vec.push(node);
-        }
-      }
+        self.select_min();
+
+      // if self.min_index.is_none(){
+      //   self.min_index = Some(0);
+      //   self.vec.push(node);
+      // }else{
+      //   if node.get_freq() < self.vec[self.min_index.unwrap()].get_freq(){
+      //     self.min_index = Some(self.min_index.unwrap() + 1);
+      //     println!("MIN INDEX: {}", self.min_index.unwrap());
+      //     self.vec.push(node);
+      //   }else{
+      //     self.vec.push(node);
+      //   }
+      // }
     }
 
     pub fn select_min(&mut self){

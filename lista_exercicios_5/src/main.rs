@@ -6,10 +6,37 @@ use std::fs::File;
 use std::io::{Cursor, Read, Write};
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 use std::io;
-use utf8_read::{Reader, StreamPosition};
+use utf8_read::{Reader};
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+struct Args {
+    operation: String,
+    file: String
+}
 
 fn main() {
-    println!("Hello, world!");
+    let args = Args::parse();
+
+    let compr: String = String::from("compr");
+    let decom: String = String::from("decom");
+
+    println!("OP: {}", args.operation);
+
+    if args.operation == compr {
+        let file_bin: Vec<&str> = args.file.split('.').collect();
+        compression(file_bin[0].to_string() + "." + file_bin[1], file_bin[0].to_string() + ".bin").unwrap();
+        println!("File compression successful!");
+    }else if args.operation == decom {
+        let file_txt: Vec<&str> = args.file.split('.').collect();
+        decompressor(file_txt[0].to_string() + "." + file_txt[1], file_txt[0].to_string() + "1.txt").unwrap();
+        println!("File decompressor successful!");
+    }else{
+        panic!("Operation not found");
+    }
+
+   
+
 }
 
 fn frequency(file: String, map_freq: &mut HashMap<char, u32>) -> io::Result<usize> {
@@ -124,7 +151,6 @@ fn write(file: String, n: u32, map_freq: &HashMap<char, u32>, vec_bytes: Vec<Str
         buffer.write_u32::<BigEndian>(*i.1)?;
     }
 
-    println!("LEN: {}", vec_bytes.len());
     for b in vec_bytes{
         buffer.write_u8(convert_string_to_u8(b))?;
     }
@@ -160,6 +186,8 @@ fn read(file: String) -> io::Result<(u32, Huffman::Huffman, Vec<u8>)> {
     vector_node.build_vector(&mut map_freq);
     let node: Huffman::Huffman =  vector_node.build_tree();
 
+    println!("NODE: {:?}", node);
+
     loop{
         if let Ok(b) =  buffer.read_u8(){
             v_u8.push(b);  
@@ -167,8 +195,6 @@ fn read(file: String) -> io::Result<(u32, Huffman::Huffman, Vec<u8>)> {
             break;
         }
     }
-
-    println!("LEN: {}", v_u8.len());
 
     Ok((mum_char, node, v_u8 ))
 }
@@ -219,10 +245,8 @@ fn convert_u8_to_string(b: u8) -> String{
 fn build_str_code(v_u8: &Vec<u8>) -> String{
     let mut str_code: String = String::new();
 
-    println!("VEC U8: {:?}", v_u8);
     for b in v_u8{
         str_code += &convert_u8_to_string(*b);
-        println!("STR CODE: {}", &convert_u8_to_string(*b));
     }
 
 
@@ -240,9 +264,6 @@ fn decompressor(file: String, file_txt: String) -> io::Result<()>{
     let mut str_code: String = build_str_code(&v_u8);
 
     let text: String = VectorNode::VectorNode::traverse_code_num_char(&mut node, &mut str_code, mum_char);
-    println!("STR CODE: {}", str_code);
-    println!("TEXT: {}", text);
-
     write_txt(file_txt, text)?;
 
     Ok(())
@@ -422,7 +443,7 @@ mod test {
 
     #[test]
     fn decompressor_test(){
-        let file_bin = "test_bin.bin";
+        let file_bin = "test.bin";
         let file_txt = "text_txt_test.txt";
 
         decompressor(file_bin.to_string(), file_txt.to_string()).unwrap();
