@@ -213,7 +213,7 @@ fn bit_mask(b: u8, i: usize) -> char{
             return '1';
         }
     }else{
-        panic!("O Indice i de ser de 0 até 7");
+        panic!("O Indice i deve ser de 0 até 7");
     }
 }
 
