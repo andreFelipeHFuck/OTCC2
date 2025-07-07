@@ -85,20 +85,20 @@ fn gen_natural_numbers(n: u128) -> Vec<u128>{
     return v;
 }
 
-fn search_next_first_position(p: u128, v: &mut Vec<u128>) -> Option<(usize, usize)> {
-
+fn search_next_first_position(v: &mut Vec<u128>, p: u128) -> Option<(usize, usize)> {
     let mut new_p = p;
     loop {
         new_p += 2;
         let (k, w) = next_first_position(new_p);
         
+        if k > v.len() - 1{
+            return None;
+        }
+
         if let Some(_) = get_value_in_bit_mask(&v, k, w){
             return Some((k, w));
         }
 
-        if k > v.len() - 1{
-            return None;
-        }
     }
 }
 
@@ -141,7 +141,7 @@ fn eratosthenes(n: u128) -> Option<Vec<u128>> {
                 }
             }
 
-            if let Some((k_aux, w_aux)) = search_next_first_position(p, &mut v){
+            if let Some((k_aux, w_aux)) = search_next_first_position(&mut v, p){
                 k = k_aux;
                 w = w_aux;
             }
@@ -163,13 +163,13 @@ fn eratosthenes(n: u128) -> Option<Vec<u128>> {
 
 // MULTI THREAD
 
-fn num_charges_per_thread(n: u128, t: u128) -> u128{
+fn num_charges_per_thread(n: u128, t: u128) -> (u128, u128){
     let q: u128 = n.isqrt() - 1;
 
     let i: u128 = (1 - 1) / 254;
     let j: u128 = (q - 254 * i - 1).div_ceil(2);
 
-    ((127 * i)  + j ).div_ceil(t)
+    (((127 * i)  + j ) / t, ((127 * i)  + j ) % t)
 }
 
 fn patches_charges_per_threads(n: u128, t: u128) -> Option<Vec<(u128, u128)>>{
@@ -177,22 +177,20 @@ fn patches_charges_per_threads(n: u128, t: u128) -> Option<Vec<(u128, u128)>>{
 
     let mut res: Vec<(u128, u128)> = Vec::new();
 
-    let len_patches: u128 = num_charges_per_thread(n, t);
+    let len_patches: (u128, u128) = num_charges_per_thread(n, t);
     let root: u128 = n.isqrt();
 
-    println!("P: {}", len_patches);
-
-    if len_patches == 0{
+    if len_patches.0 == 0{
         return None;
     }else{
         let mut init: u128 = 3; // Primeiro número a ser avaliado
 
         for _ in 0..t{
             let end = init 
-                + if len_patches % 2 == 0 { 
-                    len_patches
+                + if len_patches.0 % 2 == 0 { 
+                    len_patches.0
                 } else {
-                    len_patches + 1
+                    len_patches.0 + 1
                 };
 
             res.push(
@@ -209,12 +207,66 @@ fn patches_charges_per_threads(n: u128, t: u128) -> Option<Vec<(u128, u128)>>{
     }
 }
 
-fn get_value_in_bit_mask_multithread(v: Arc<RwLock<Vec<u128>>>, i: usize, j: usize) -> Option<u128>{
-    None
+fn get_value_in_bit_mask_multithread(v: &Arc<RwLock<Vec<u128>>>, i: usize, j: usize) -> Option<u128>{
+
+    let vec = v.read().unwrap();
+
+    if !bit_is_marked(&vec, i, j) {Some(value_of_bit(i, j))} else {None}
 }
 
-fn search_next_first_position_multithread(v: Arc<RwLock<Vec<u128>>>, i: usize, j: usize) -> Option<(usize, usize)> {
-    None
+fn bit_is_marked_multithread(v: &Arc<RwLock<Vec<u128>>>, i: usize, j: usize) -> bool{
+    /*
+    i posição do u128 no vector
+    j posição do bit no u128
+    
+    Se o bit estiver em 0 não está marcado podendo ser um possível número primo,
+    Se estiver em 1 o bit está marcado e não um número primo
+    */
+    
+    if j <= 127 {
+        let mask: u128 = 0 | (1 << j);
+        
+        let vec = v.read().unwrap();
+
+        if vec[i] & mask == 0 {
+            return false;
+        }else{
+            return true;
+        }
+    }else{
+        panic!("O indice j deve ser de 0 até 127")
+    }
+}
+
+fn add_bit_multithread(v: &Arc<RwLock<Vec<u128>>>, i: usize, j: usize) {
+    if j <= 127 {
+        let mut vec = v.write().unwrap();
+        vec[i] = vec[i] | (1u128 << j);
+    }else{
+        panic!("O indice j deve ser de 0 até 127")
+    }
+
+}
+
+fn search_next_first_position_multithread(v: &Arc<RwLock<Vec<u128>>>, p: u128) -> Option<(usize, usize)> {
+    let mut new_p = p;
+
+    let vec = v.read().unwrap();
+    
+    loop {
+        new_p += 2;
+        let (k, w) = next_first_position(new_p);
+        
+        if k > vec.len() - 1{
+            return None;
+        }
+        
+        let vec_clone = Arc::clone(&v);
+        if let Some(_) = get_value_in_bit_mask_multithread(&vec_clone, k, w){
+            return Some((k, w));
+        }
+
+    }
 }
 
 
@@ -257,7 +309,6 @@ mod tests {
 
         assert_eq!(cont, 0);
     }
-
 
     #[test]
     fn test_if_80_bits_have_been_marked_with_n_10_000(){
@@ -445,7 +496,6 @@ mod tests {
         ]));
     }
 
-
     #[test]
     fn test_eratosthenes_very_great_numbers(){
         assert_eq!(eratosthenes(7_919).unwrap().len(), 1_000);
@@ -453,8 +503,8 @@ mod tests {
 
     #[test]
     fn test_num_charges_per_thread(){
-        assert_eq!(num_charges_per_thread(255, 3), 3);
-        assert_eq!(num_charges_per_thread(7_919, 4), 11);
+        assert_eq!(num_charges_per_thread(255, 3), (2, 1));
+        assert_eq!(num_charges_per_thread(7_919, 4), (10, 3));
     }
 
     #[test]
@@ -464,5 +514,31 @@ mod tests {
 
         assert_eq!(patches_charges_per_threads(n, 0), None);
         assert_eq!(patches_charges_per_threads(n, t), Some(vec![(3, 7), (9, 13), (15, 0)]))
+    }
+
+    #[test]
+    fn test_get_value_in_bit_mask_multithread(){
+        let shared_vector = Arc::new(RwLock::new(gen_natural_numbers(256)));
+
+        assert_eq!(get_value_in_bit_mask_multithread(&shared_vector, 0, 0), Some(2));
+    }
+
+    #[test]
+    fn test_add_bit_multithread(){
+        let shared_vector_1 = Arc::new(RwLock::new(vec![1u128, 0u128]));
+        let shared_vector_2 = Arc::new(RwLock::new(vec![0; 10_000]));
+
+        add_bit_multithread(&shared_vector_1, 1, 0);
+        add_bit_multithread(&shared_vector_2, 9_999, 127);
+
+        assert!(bit_is_marked_multithread(&shared_vector_1, 1, 0));
+        assert!(bit_is_marked_multithread(&shared_vector_2, 9_999, 127));
+    }
+
+    #[test]
+    fn test_search_next_first_position_multithread(){
+        let shared_vector = Arc::new(RwLock::new(gen_natural_numbers(256)));
+
+        assert_eq!(search_next_first_position_multithread(&shared_vector, 3), Some((0, 2)));
     }
 }
