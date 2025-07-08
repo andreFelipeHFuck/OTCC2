@@ -6,6 +6,7 @@ tendo como limite para n o maior valor armazenado em um dado u128.
 */
 
 use std::sync::{Arc, RwLock};
+use std::thread;
 
 // UNI THREAD
 
@@ -123,7 +124,7 @@ fn eratosthenes(n: u128) -> Option<Vec<u128>> {
             let (a, mut b) = next_first_position(p.pow(2));
 
             for i in a..v.len(){
-                if p != u128::MAX{
+                if v[i] != u128::MAX{
                     for j in b..127{
                         
                     if let Some(n) = get_value_in_bit_mask(&v, i, j){
@@ -182,7 +183,6 @@ fn patches_charges_per_threads(n: u128, t: u128) -> Option<Vec<(u128, u128)>>{
     let mut res: Vec<(u128, u128)> = Vec::new();
 
     let len_patches: (u128, u128, u128) = num_charges_per_thread(n, t);
-    let root: u128 = n.isqrt();
 
     if len_patches.0 == 0{
         return None;
@@ -282,6 +282,49 @@ fn search_next_first_position_multithread(v: &Arc<RwLock<Vec<u128>>>, p: u128) -
     }
 }
 
+fn get_len_vector_mutithread(v:  &Arc<RwLock<Vec<u128>>>) -> usize {
+    let vec = v.read().unwrap();
+
+    vec.len()
+}
+
+fn eratosthenes_patches_thread_multithread(v:  Arc<RwLock<Vec<u128>>>, patch: (u128, u128)) {
+   let (p_k, p_w) =  next_first_position(patch.0);
+
+   let mut k: usize = p_k;
+   let mut w: usize = p_w;
+    
+   while value_of_bit(k, w) <= patch.1 {
+        let p: u128 = value_of_bit(k, w);
+
+        // Adciona ao vetor
+
+        let (a, mut b) = next_first_position(p.pow(2));
+
+        for i in a..get_len_vector_mutithread(&v){
+            for j in b..127{
+
+                if let Some(n) = get_value_in_bit_mask_multithread(&v, i, j){
+                    if n != p {
+                        if n % p == 0 {
+                            add_bit_multithread(&v, i, j);
+                        }
+                    }
+                }
+
+                b = 0;
+            }
+        }
+
+        if let Some((k_aux, w_aux)) = search_next_first_position_multithread(&v, p) {
+            k = k_aux;
+            w = w_aux;
+        }
+
+        println!("K: {}, W: {}", k, w);
+   }
+}
+
 
 // fn eratosthenes_multithread(n: u128, t: u128) -> Option<Vec<u128>> {
 
@@ -289,6 +332,8 @@ fn search_next_first_position_multithread(v: &Arc<RwLock<Vec<u128>>>, p: u128) -
 
 #[cfg(test)]
 mod tests {
+    use std::thread::JoinHandle;
+
     use super::*;
 
     #[test]
@@ -525,8 +570,6 @@ mod tests {
         let n: u128 = 225;
         let t: u128 = 3;
 
-        println!("TESTE: {:?}", patches_charges_per_threads(7919, 4).unwrap());
-
         assert_eq!(patches_charges_per_threads(n, 0), None);
         assert_eq!(patches_charges_per_threads(n, t), Some(vec![(3, 7), (9, 13), (15, 15)]))
     }
@@ -556,4 +599,85 @@ mod tests {
 
         assert_eq!(search_next_first_position_multithread(&shared_vector, 3), Some((0, 2)));
     }
+
+    #[test]
+   fn test_eratosthenes_patches_thread_multithread_3_7(){
+       let shared_vector = Arc::new(RwLock::new(gen_natural_numbers(225)));
+       let mut res: Vec<u128> = vec![2];
+
+       let data_clone: Arc<RwLock<Vec<u128>>> = Arc::clone(&shared_vector);
+
+       eratosthenes_patches_thread_multithread(shared_vector, (3, 7));
+
+        for i in 0..1{
+            for j in 1..4{
+                if let Some(n) = get_value_in_bit_mask_multithread(&data_clone, i, j){
+                    res.push(n);
+                }
+            }
+        }
+
+        assert_eq!(res, vec![2, 3, 5, 7]);
+   }
+
+   #[test]
+   fn test_eratosthenes_patches_thread_multithread_9_13(){
+       let shared_vector = Arc::new(RwLock::new(gen_natural_numbers(225)));
+       let mut res: Vec<u128> = vec![];
+
+        let data_clone: Arc<RwLock<Vec<u128>>> = Arc::clone(&shared_vector);
+
+       eratosthenes_patches_thread_multithread(shared_vector, (9, 13));
+
+        for i in 0..1{
+            for j in 4..7{
+                if let Some(n) = get_value_in_bit_mask_multithread(&data_clone, i, j){
+                    res.push(n);
+                }
+            }
+        }
+
+        // O 9 não marcado
+        assert_eq!(res, vec![9, 11, 13]);
+   }
+
+   #[test]
+   fn test_eratosthenes_patches_thread_multithread_3_7_9_13(){
+       let shared_vector = Arc::new(RwLock::new(gen_natural_numbers(225)));
+       let mut res: Vec<u128> = vec![2];
+
+       let patches: Vec<(u128, u128)> = vec![(3, 7)];
+
+       let mut handles: Vec<JoinHandle<()>> = Vec::new();
+
+       for i in patches {
+
+        let clone = Arc::clone(&shared_vector);
+
+        let handle = thread::spawn(move || {
+            {
+                eratosthenes_patches_thread_multithread(clone, i);
+            }
+        });
+
+        handles.push(handle);
+       }
+
+       for handle in handles {
+            handle.join().unwrap();
+       }
+
+       for i in 0..1{
+            for j in 1..7{
+                if let Some(n) = get_value_in_bit_mask_multithread(&shared_vector, i, j){
+                    res.push(n);
+                }
+            }
+       }
+
+       println!("RES: {:?}", res);
+
+     assert_eq!(res, vec![2, 3, 5, 7, 11, 13]);
+
+   }
 }
