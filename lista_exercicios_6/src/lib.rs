@@ -116,8 +116,6 @@ fn eratosthenes(n: u128) -> Option<Vec<u128>> {
         let mut k: usize = 0;
         let mut w: usize = 1;
 
-        let mut c: i32 = 0;
-
         while value_of_bit(k, w) <= stopping {
             let p: u128 = value_of_bit(k, w);
             res.push(p);
@@ -163,13 +161,19 @@ fn eratosthenes(n: u128) -> Option<Vec<u128>> {
 
 // MULTI THREAD
 
-fn num_charges_per_thread(n: u128, t: u128) -> (u128, u128){
-    let q: u128 = n.isqrt() - 1;
+fn num_charges_per_thread(n: u128, t: u128) -> (u128, u128, u128){
+    let q: u128 = n.isqrt();
 
-    let i: u128 = (1 - 1) / 254;
+    let i: u128 = (q - 1) / 254;
+
+    // Arredondamento para cima 
+    // (valor + divisor - 1) / divisor;
     let j: u128 = (q - 254 * i - 1).div_ceil(2);
-
-    (((127 * i)  + j ) / t, ((127 * i)  + j ) % t)
+    (
+        ((127 * i)  + j + t - 1) / t,
+        ((127 * i)  + j ) / t, 
+        ((127 * i)  + j ) % t
+    )
 }
 
 fn patches_charges_per_threads(n: u128, t: u128) -> Option<Vec<(u128, u128)>>{
@@ -177,30 +181,39 @@ fn patches_charges_per_threads(n: u128, t: u128) -> Option<Vec<(u128, u128)>>{
 
     let mut res: Vec<(u128, u128)> = Vec::new();
 
-    let len_patches: (u128, u128) = num_charges_per_thread(n, t);
+    let len_patches: (u128, u128, u128) = num_charges_per_thread(n, t);
     let root: u128 = n.isqrt();
 
     if len_patches.0 == 0{
         return None;
     }else{
         let mut init: u128 = 3; // Primeiro número a ser avaliado
+        let mut num_t: usize = t as usize;
 
-        for _ in 0..t{
-            let end = init 
-                + if len_patches.0 % 2 == 0 { 
-                    len_patches.0
-                } else {
-                    len_patches.0 + 1
-                };
+       if len_patches.2 > 0 {
+            num_t -= 1
+        }
+
+        for _ in 0..num_t{
+            let end = init + 2 * (len_patches.0 - 1);
 
             res.push(
                 (
                     init, 
-                    if end <= root {end} else {0}
+                    end
                 )
             );
 
             init = end + 2;
+        }
+
+        if len_patches.2 > 0 {
+              res.push(
+                (
+                    init, 
+                    init + 2 * (len_patches.2 - 1)
+                )
+            );
         }
 
         return Some(res);
@@ -503,8 +516,8 @@ mod tests {
 
     #[test]
     fn test_num_charges_per_thread(){
-        assert_eq!(num_charges_per_thread(255, 3), (2, 1));
-        assert_eq!(num_charges_per_thread(7_919, 4), (10, 3));
+        assert_eq!(num_charges_per_thread(255, 3), (3, 2, 1));
+        assert_eq!(num_charges_per_thread(7_919, 4), (11, 10, 3));
     }
 
     #[test]
@@ -512,8 +525,10 @@ mod tests {
         let n: u128 = 225;
         let t: u128 = 3;
 
+        println!("TESTE: {:?}", patches_charges_per_threads(7919, 4).unwrap());
+
         assert_eq!(patches_charges_per_threads(n, 0), None);
-        assert_eq!(patches_charges_per_threads(n, t), Some(vec![(3, 7), (9, 13), (15, 0)]))
+        assert_eq!(patches_charges_per_threads(n, t), Some(vec![(3, 7), (9, 13), (15, 15)]))
     }
 
     #[test]
